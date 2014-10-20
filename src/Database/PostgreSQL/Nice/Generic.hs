@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables, DeriveGeneric, FlexibleInstances, ConstraintKinds, DataKinds, GADTs #-}
 
-module Database.PostgreSQL.Nice.Generic (gfromRow, gtoRow, gselect) where
+module Database.PostgreSQL.Nice.Generic (gfromRow, gtoRow, gselect, ginsertInto) where
 
 import Generics.SOP
 import Control.Applicative
@@ -44,3 +44,13 @@ fNmsRec (FieldInfo nm :* rest) = nm : fNmsRec rest
 
 gselect :: forall r q. (ToRow q, FromRow r, Generic r, HasDatatypeInfo r) => Connection -> Query -> q -> IO [r]
 gselect conn q1 args = query conn ("select (" <> (fromString $ intercalate "," $ fieldNames $ (Proxy :: Proxy r) ) <> ") " <> q1) args
+
+ginsertInto :: forall r. (ToRow r, Generic r, HasDatatypeInfo r) => Connection -> Query -> r -> IO ()
+ginsertInto conn tbl val = do
+  let fnms = fieldNames $ (Proxy :: Proxy r)
+  _ <- execute conn ("INSERT INTO " <> tbl <> " (" <> 
+                     (fromString $ intercalate "," fnms ) <> 
+                     ") VALUES (" <> 
+                     (fromString $ intercalate "," $ map (const "?") fnms) <> ")")
+               val
+  return ()
