@@ -14,7 +14,6 @@ cabal-version:       >=1.8
 
 library
   exposed-modules:     Database.PostgreSQL.Nice.Generic
-                     , Database.PostgreSQL.Nice.Mapped
   hs-source-dirs:      src
   ghc-options:         -Wall -fno-warn-unused-do-bind -fno-warn-orphans -fwarn-incomplete-patterns
   build-depends:       base ==4.6.*
