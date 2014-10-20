@@ -1,6 +1,30 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables, DeriveGeneric, FlexibleInstances, ConstraintKinds, DataKinds, GADTs #-}
 
-module Database.PostgreSQL.Simple.SOP (gfromRow, gtoRow, gselect, ginsertInto) where
+{- |
+
+Generic functions to make working with postgresql-simple easier.
+
+Original implmentation of gfromRow and gtoRow by
+<https://ocharles.org.uk/blog/posts/2014-08-07-postgresql-simple-generic-sop.html Ollie Charles>.
+
+Intended usage:
+
+@
+import qualified GHC.Generics as GHC
+import Generics.SOP
+
+data Person = Person { name:: String, age:: Int } deriving (GHC.Generic)
+
+instance Generic Person
+instance HasDatatypeInfo Person
+
+instance FromRow Person where fromRow = gfromRow
+instance ToRow Person where toRow = gtoRow
+@
+
+-}
+
+module Database.PostgreSQL.Simple.SOP (gfromRow, gtoRow, gselectFrom, ginsertInto) where
 
 import Generics.SOP
 import Control.Applicative
@@ -13,14 +37,16 @@ import Database.PostgreSQL.Simple.FromRow
 import Database.PostgreSQL.Simple.FromField
 import Database.PostgreSQL.Simple.ToField
 
--- https://ocharles.org.uk/blog/posts/2014-08-07-postgresql- simple-generic-sop.html
+-- 
 
+-- |Generic fromRow
 gfromRow
   :: (All FromField xs, Code a ~ '[xs], SingI xs, Generic a)
   => RowParser a
 gfromRow = to . SOP . Z <$> hsequence (hcpure fromFieldp field)
   where fromFieldp = Proxy :: Proxy FromField
 
+-- |Generic toRow
 gtoRow :: (Generic a, Code a ~ '[xs], All ToField xs, SingI xs) => a -> [Action]
 gtoRow a =
   case from a of
@@ -40,11 +66,27 @@ fNmsRec :: NP FieldInfo a -> [String]
 fNmsRec Nil = []
 fNmsRec (FieldInfo nm :* rest) = nm : fNmsRec rest
 
--- gselect conn "from persons where name = ? " theName
+-- 
 
-gselect :: forall r q. (ToRow q, FromRow r, Generic r, HasDatatypeInfo r) => Connection -> Query -> q -> IO [r]
-gselect conn q1 args = query conn ("select (" <> (fromString $ intercalate "," $ fieldNames $ (Proxy :: Proxy r) ) <> ") " <> q1) args
+{-|Generic select
 
+@
+gselectFrom conn \"persons where name = ?\" theName
+@
+
+-}
+gselectFrom :: forall r q. (ToRow q, FromRow r, Generic r, HasDatatypeInfo r) => Connection -> Query -> q -> IO [r]
+gselectFrom conn q1 args = query conn ("select (" <> (fromString $ intercalate "," $ fieldNames $ (Proxy :: Proxy r) ) <> ") from " <> q1) args
+
+{-|Generic insert
+
+@
+let thePerson = Person \"Tom\" 37
+ginsertInto conn \"persons\" thePerson
+@
+
+This is not going to work if you use auto-incrementing primary keys and the primary key is part of the Haskell record.
+-}
 ginsertInto :: forall r. (ToRow r, Generic r, HasDatatypeInfo r) => Connection -> Query -> r -> IO ()
 ginsertInto conn tbl val = do
   let fnms = fieldNames $ (Proxy :: Proxy r)
