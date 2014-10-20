@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables, DeriveGeneric, FlexibleInstances, ConstraintKinds, DataKinds, GADTs #-}
 
-module Database.PostgreSQL.Nice.Generic (gfromRow, gtoRow, gselect, ginsertInto) where
+module Database.PostgreSQL.Simple.SOP (gfromRow, gtoRow, gselect, ginsertInto) where
 
 import Generics.SOP
 import Control.Applicative
