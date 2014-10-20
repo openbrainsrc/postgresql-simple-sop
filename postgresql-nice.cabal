@@ -19,3 +19,4 @@ library
   ghc-options:         -Wall -fno-warn-unused-do-bind -fno-warn-orphans -fwarn-incomplete-patterns
   build-depends:       base ==4.6.*
                      , postgresql-simple
+                     , generics-sop
