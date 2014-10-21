@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, DeriveGeneric, FlexibleInstances, ConstraintKinds, DataKinds, GADTs #-}
+{-# LANGUAGE DefaultSignatures, OverloadedStrings, ScopedTypeVariables, DeriveGeneric, FlexibleInstances, ConstraintKinds, DataKinds, GADTs #-}
 
 {- |
 
@@ -37,7 +37,7 @@ import Database.PostgreSQL.Simple.FromRow
 import Database.PostgreSQL.Simple.FromField
 import Database.PostgreSQL.Simple.ToField
 
--- 
+--
 
 -- |Generic fromRow
 gfromRow
@@ -54,11 +54,6 @@ gtoRow a =
 
   where toFieldP = Proxy :: Proxy ToField
 
-fieldNames :: forall a. (Generic a, HasDatatypeInfo a) => Proxy a -> [String]
-fieldNames _ = case datatypeInfo (Proxy :: Proxy a) of
-  ADT     _ _ cs -> fNms cs
-  Newtype _ _ c -> fNms $ c :* Nil
-
 fNms :: NP ConstructorInfo a -> [String]
 fNms ((Record _ fs) :* _) = fNmsRec fs
 
@@ -66,7 +61,15 @@ fNmsRec :: NP FieldInfo a -> [String]
 fNmsRec Nil = []
 fNmsRec (FieldInfo nm :* rest) = nm : fNmsRec rest
 
--- 
+--
+
+class HasFieldNames a where
+  fieldNames :: Proxy a -> [String]
+
+  default fieldNames :: (Generic a, HasDatatypeInfo a) => Proxy a -> [String]
+  fieldNames p = case datatypeInfo p of
+    ADT     _ _ cs -> fNms cs
+    Newtype _ _ c -> fNms $ c :* Nil
 
 {-|Generic select
 
@@ -75,7 +78,7 @@ gselectFrom conn \"persons where name = ?\" theName
 @
 
 -}
-gselectFrom :: forall r q. (ToRow q, FromRow r, Generic r, HasDatatypeInfo r) => Connection -> Query -> q -> IO [r]
+gselectFrom :: forall r q. (ToRow q, FromRow r, Generic r, HasFieldNames r) => Connection -> Query -> q -> IO [r]
 gselectFrom conn q1 args = query conn ("select (" <> (fromString $ intercalate "," $ fieldNames $ (Proxy :: Proxy r) ) <> ") from " <> q1) args
 
 {-|Generic insert
@@ -87,12 +90,12 @@ ginsertInto conn \"persons\" thePerson
 
 This is not going to work if you use auto-incrementing primary keys and the primary key is part of the Haskell record.
 -}
-ginsertInto :: forall r. (ToRow r, Generic r, HasDatatypeInfo r) => Connection -> Query -> r -> IO ()
+ginsertInto :: forall r. (ToRow r, Generic r, HasFieldNames r) => Connection -> Query -> r -> IO ()
 ginsertInto conn tbl val = do
   let fnms = fieldNames $ (Proxy :: Proxy r)
-  _ <- execute conn ("INSERT INTO " <> tbl <> " (" <> 
-                     (fromString $ intercalate "," fnms ) <> 
-                     ") VALUES (" <> 
+  _ <- execute conn ("INSERT INTO " <> tbl <> " (" <>
+                     (fromString $ intercalate "," fnms ) <>
+                     ") VALUES (" <>
                      (fromString $ intercalate "," $ map (const "?") fnms) <> ")")
                val
   return ()
