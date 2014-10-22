@@ -1,7 +1,7 @@
-name:                postgresql-sop
+name:                postgresql-simple-sop
 version:             0.1.0.0
 synopsis:            Generic functions for postgresql-simple
-homepage:            https://github.com/openbrainsrc/postgresql-sio
+homepage:            https://github.com/openbrainsrc/postgresql-simple-sop
 license:             MIT
 license-file:        LICENSE
 author:              Tom Nielsen
