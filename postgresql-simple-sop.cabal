@@ -13,6 +13,6 @@ library
   exposed-modules:     Database.PostgreSQL.Simple.SOP
   hs-source-dirs:      src
   ghc-options:         -Wall -fno-warn-unused-do-bind -fno-warn-orphans -fwarn-incomplete-patterns
-  build-depends:       base >= 4.6
+  build-depends:       base >= 4.6 && < 5
                      , postgresql-simple
                      , generics-sop
