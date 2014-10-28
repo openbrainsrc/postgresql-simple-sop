@@ -24,7 +24,7 @@ instance ToRow Person where toRow = gtoRow
 
 -}
 
-module Database.PostgreSQL.Simple.SOP (gfromRow, gtoRow, gselectFrom, ginsertInto) where
+module Database.PostgreSQL.Simple.SOP (gfromRow, gtoRow, gselectFrom, ginsertInto, HasFieldNames) where
 
 import Generics.SOP
 import Control.Applicative
