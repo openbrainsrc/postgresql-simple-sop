@@ -79,7 +79,9 @@ gselectFrom conn \"persons where name = ?\" theName
 
 -}
 gselectFrom :: forall r q. (ToRow q, FromRow r, Generic r, HasFieldNames r) => Connection -> Query -> q -> IO [r]
-gselectFrom conn q1 args = query conn ("select (" <> (fromString $ intercalate "," $ fieldNames $ (Proxy :: Proxy r) ) <> ") from " <> q1) args
+gselectFrom conn q1 args = do
+  let fullq = "select " <> (fromString $ intercalate "," $ fieldNames $ (Proxy :: Proxy r) ) <> " from " <> q1
+  query conn fullq args
 
 {-|Generic insert
 
