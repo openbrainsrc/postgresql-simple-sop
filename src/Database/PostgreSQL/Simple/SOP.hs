@@ -24,7 +24,7 @@ instance ToRow Person where toRow = gtoRow
 
 -}
 
-module Database.PostgreSQL.Simple.SOP (gfromRow, gtoRow, gselectFrom, ginsertInto, HasFieldNames, fieldNames) where
+module Database.PostgreSQL.Simple.SOP (gfromRow, gtoRow, gselectFrom, ginsertInto, ginsertManyInto, HasFieldNames, fieldNames) where
 
 import Generics.SOP
 import Control.Applicative
@@ -103,4 +103,14 @@ ginsertInto conn tbl val = do
                      ") VALUES (" <>
                      (fromString $ intercalate "," $ map (const "?") fnms) <> ")")
                val
+  return ()
+
+ginsertManyInto :: forall r. (ToRow r, Generic r, HasFieldNames r) => Connection -> Query -> [r] -> IO ()
+ginsertManyInto conn tbl vals = do
+  let fnms = fieldNames $ (Proxy :: Proxy r)
+  _ <- executeMany conn ("INSERT INTO " <> tbl <> " (" <>
+                     (fromString $ intercalate "," fnms ) <>
+                     ") VALUES (" <>
+                     (fromString $ intercalate "," $ map (const "?") fnms) <> ")")
+               vals
   return ()
