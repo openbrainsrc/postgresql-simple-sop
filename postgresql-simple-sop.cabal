@@ -1,5 +1,5 @@
 name:                postgresql-simple-sop
-version:             0.1.0.4
+version:             0.1.0.6
 synopsis:            Generic functions for postgresql-simple
 homepage:            https://github.com/openbrainsrc/postgresql-simple-sop
 license:             MIT
