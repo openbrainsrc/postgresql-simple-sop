@@ -1,4 +1,4 @@
-{-# LANGUAGE DefaultSignatures, OverloadedStrings, ScopedTypeVariables, DeriveGeneric, FlexibleInstances, ConstraintKinds, DataKinds, GADTs #-}
+{-# LANGUAGE DefaultSignatures, OverloadedStrings, ScopedTypeVariables, DeriveGeneric, FlexibleInstances, ConstraintKinds, DataKinds, GADTs, TypeOperators #-}
 
 {- |
 
@@ -70,6 +70,9 @@ class HasFieldNames a where
   fieldNames p = case datatypeInfo p of
     ADT     _ _ cs -> fNms cs
     Newtype _ _ c -> fNms $ c :* Nil
+
+instance (HasFieldNames a, HasFieldNames b) => HasFieldNames (a:.b) where
+  fieldNames proxy =fieldNames (Proxy::Proxy a) ++ fieldNames (Proxy::Proxy b)
 
 {-|Generic select
 
