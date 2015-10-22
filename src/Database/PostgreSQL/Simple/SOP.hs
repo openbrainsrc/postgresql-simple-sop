@@ -1,4 +1,4 @@
-{-# LANGUAGE DefaultSignatures, OverloadedStrings, ScopedTypeVariables, DeriveGeneric, FlexibleInstances, ConstraintKinds, DataKinds, GADTs, TypeOperators #-}
+{-# LANGUAGE DefaultSignatures, OverloadedStrings, ScopedTypeVariables, DeriveGeneric, FlexibleInstances, ConstraintKinds, DataKinds, GADTs, TypeOperators, FlexibleContexts #-}
 
 {- |
 
@@ -41,13 +41,13 @@ import Database.PostgreSQL.Simple.ToField
 
 -- |Generic fromRow
 gfromRow
-  :: (All FromField xs, Code a ~ '[xs], SingI xs, Generic a)
+  :: (All FromField xs, Code a ~ '[xs], Generic a)
   => RowParser a
 gfromRow = to . SOP . Z <$> hsequence (hcpure fromFieldp field)
   where fromFieldp = Proxy :: Proxy FromField
 
 -- |Generic toRow
-gtoRow :: (Generic a, Code a ~ '[xs], All ToField xs, SingI xs) => a -> [Action]
+gtoRow :: (Generic a, Code a ~ '[xs], All ToField xs) => a -> [Action]
 gtoRow a =
   case from a of
     SOP (Z xs) -> hcollapse (hcliftA toFieldP (K . toField . unI) xs)
