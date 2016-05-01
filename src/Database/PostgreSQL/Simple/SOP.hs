@@ -1,4 +1,4 @@
-{-# LANGUAGE DefaultSignatures, OverloadedStrings, ScopedTypeVariables, DeriveGeneric, FlexibleInstances, ConstraintKinds, DataKinds, GADTs, TypeOperators #-}
+{-# LANGUAGE DefaultSignatures, OverloadedStrings, ScopedTypeVariables, DeriveGeneric, FlexibleInstances, ConstraintKinds, DataKinds, GADTs, TypeOperators, FlexibleContexts, TypeFamilies #-}
 
 {- |
 
@@ -114,3 +114,59 @@ ginsertManyInto conn tbl vals = do
                      (fromString $ intercalate "," $ map (const "?") fnms) <> ")")
                vals
   return ()
+
+class (HasFieldNames a, FromRow a, ToRow a) => HasTable a where
+  tableName :: Proxy a -> Query
+
+gselect :: forall r q. (ToRow q, FromRow r, Generic r, HasFieldNames r) => Connection -> Query -> q -> IO [r]
+gselect conn q1 args = do
+  let fullq = "select " <> (fromString $ intercalate "," $ fieldNames $ (Proxy :: Proxy r) ) <> " from "
+                        <> tableName (Proxy :: Proxy r) <> " " <> q1
+  query conn fullq args
+
+ginsertNoKey :: forall r. (ToRow r, Generic r, HasFieldNames r) => Connection  -> r -> IO ()
+ginsertNoKey conn  val = do
+  let fnms = fieldNames $ (Proxy :: Proxy r)
+  _ <- execute conn ("INSERT INTO " <> tableName (Proxy :: Proxy r) <> " (" <>
+                     (fromString $ intercalate "," fnms ) <>
+                     ") VALUES (" <>
+                     (fromString $ intercalate "," $ map (const "?") fnms) <> ")")
+               val
+  return ()
+
+gcount :: :: forall r q. (ToRow q, FromRow r, Generic r, HasFieldNames r) => Connection -> Query -> q -> IO Int
+gcount conn q1 args = do
+  let unOnly (Only x) = x
+      fullq = "select count(*) from "
+                        <> tableName (Proxy :: Proxy r) <> " " <> q1
+  fmap (head . unOnly) $ query conn fullq args
+
+class HasTable a => HasKey a
+   type Key a
+   getKey :: a -> Key a
+   keyName :: Proxy a -> Query
+   autoIncrementingKey :: Proxy a -> Bool
+
+getByKey :: (HasKey a, ToField (Key a)) => Connection -> Key a -> IO (Maybe a)
+getByKey conn key = gselectWhere (keyName (Proxy :: Proxy a) " = ?") (Only  key)
+
+deleteByKey :: (HasKey a, ToField (Key a)) => Connection -> Key a -> IO ()
+deleteByKey conn key = exectue conn ("delete from "<>tableName (Proxy :: Proxy r)<>" where "
+                                     <> (keyName (Proxy :: Proxy a) " = ?")) (Only  key)
+
+ginsert :: (HasKey a, ToField (Key a)) => Connection -> a -> IO (Key a)
+ginsert conn val = do
+  if autoIncrementingKey $ Proxy :: Proxy a
+     then ginsertSerial
+     else ginsertNoKey conn val
+   where ginsertSerial = do
+           let kName = keyName $ Proxy :: Proxy a
+               tblName = tableName $ Proxy :: Proxy r
+               fldNms = map fromString $ fieldNames $ (Proxy :: Proxy r)
+               fldNmsNoKey = filter (/=kName) fldNms
+               qmarks = mconcat $ intersperse "," $ map (const "?") fldNms
+               fields = mconcat $ intersperse "," $ fldNms
+               rows = toRow val
+               q = "insert into "<>tblNameM<>"("<>fields<>") values ("<>qmarks<>") returning "<>kName
+               args = map snd $ filter ((/=kName) . fst) $ zip fldNms rows
+           query conn q args
