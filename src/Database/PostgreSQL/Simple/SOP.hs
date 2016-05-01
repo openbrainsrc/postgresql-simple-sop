@@ -29,13 +29,15 @@ module Database.PostgreSQL.Simple.SOP (gfromRow, gtoRow, gselectFrom, ginsertInt
 import Generics.SOP
 import Control.Applicative
 import Data.Monoid ((<>))
-import Data.List (intercalate)
+import Data.List (intercalate, intersperse)
 import Data.String (fromString)
+import Data.Maybe (listToMaybe)
 
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromRow
 import Database.PostgreSQL.Simple.FromField
 import Database.PostgreSQL.Simple.ToField
+import Database.PostgreSQL.Simple.ToRow
 
 --
 
@@ -118,13 +120,13 @@ ginsertManyInto conn tbl vals = do
 class (HasFieldNames a, FromRow a, ToRow a) => HasTable a where
   tableName :: Proxy a -> Query
 
-gselect :: forall r q. (ToRow q, FromRow r, Generic r, HasFieldNames r) => Connection -> Query -> q -> IO [r]
+gselect :: forall r q. (ToRow q, FromRow r, HasTable r) => Connection -> Query -> q -> IO [r]
 gselect conn q1 args = do
   let fullq = "select " <> (fromString $ intercalate "," $ fieldNames $ (Proxy :: Proxy r) ) <> " from "
                         <> tableName (Proxy :: Proxy r) <> " " <> q1
   query conn fullq args
 
-ginsertNoKey :: forall r. (ToRow r, Generic r, HasFieldNames r) => Connection  -> r -> IO ()
+ginsertNoKey :: forall r. (ToRow r, HasTable r) => Connection  -> r -> IO ()
 ginsertNoKey conn  val = do
   let fnms = fieldNames $ (Proxy :: Proxy r)
   _ <- execute conn ("INSERT INTO " <> tableName (Proxy :: Proxy r) <> " (" <>
@@ -134,25 +136,19 @@ ginsertNoKey conn  val = do
                val
   return ()
 
-gcount :: :: forall r q. (ToRow q, FromRow r, Generic r, HasFieldNames r) => Connection -> Query -> q -> IO Int
-gcount conn q1 args = do
-  let unOnly (Only x) = x
-      fullq = "select count(*) from "
-                        <> tableName (Proxy :: Proxy r) <> " " <> q1
-  fmap (head . unOnly) $ query conn fullq args
-
-class HasTable a => HasKey a
+class HasTable a => HasKey a where
    type Key a
    getKey :: a -> Key a
    keyName :: Proxy a -> Query
    autoIncrementingKey :: Proxy a -> Bool
 
 getByKey :: (HasKey a, ToField (Key a)) => Connection -> Key a -> IO (Maybe a)
-getByKey conn key = gselectWhere (keyName (Proxy :: Proxy a) " = ?") (Only  key)
+getByKey conn key = fmap listToMaybe $ gselect conn ("where "<>keyName (Proxy :: Proxy a)<>" = ?") (Only  key)
 
-deleteByKey :: (HasKey a, ToField (Key a)) => Connection -> Key a -> IO ()
-deleteByKey conn key = exectue conn ("delete from "<>tableName (Proxy :: Proxy r)<>" where "
-                                     <> (keyName (Proxy :: Proxy a) " = ?")) (Only  key)
+delete :: (HasKey a, ToField (Key a)) => Connection -> a -> IO ()
+delete conn x = do execute conn ("delete from "<>tableName (Proxy :: Proxy r)<>" where "
+                                 <> (keyName (Proxy :: Proxy a) " = ?")) (Only $ getKey x)
+                   return ()
 
 ginsert :: (HasKey a, ToField (Key a)) => Connection -> a -> IO (Key a)
 ginsert conn val = do
@@ -167,6 +163,6 @@ ginsert conn val = do
                qmarks = mconcat $ intersperse "," $ map (const "?") fldNms
                fields = mconcat $ intersperse "," $ fldNms
                rows = toRow val
-               q = "insert into "<>tblNameM<>"("<>fields<>") values ("<>qmarks<>") returning "<>kName
+               q = "insert into "<>tblName<>"("<>fields<>") values ("<>qmarks<>") returning "<>kName
                args = map snd $ filter ((/=kName) . fst) $ zip fldNms rows
            query conn q args
