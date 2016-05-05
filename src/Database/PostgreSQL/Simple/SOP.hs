@@ -142,27 +142,37 @@ class HasTable a => HasKey a where
    keyName :: Proxy a -> Query
    autoIncrementingKey :: Proxy a -> Bool
 
-getByKey :: (HasKey a, ToField (Key a)) => Connection -> Key a -> IO (Maybe a)
+getByKey :: forall a . (HasKey a, ToField (Key a)) => Connection -> Key a -> IO (Maybe a)
 getByKey conn key = fmap listToMaybe $ gselect conn ("where "<>keyName (Proxy :: Proxy a)<>" = ?") (Only  key)
 
-delete :: (HasKey a, ToField (Key a)) => Connection -> a -> IO ()
-delete conn x = do execute conn ("delete from "<>tableName (Proxy :: Proxy r)<>" where "
-                                 <> (keyName (Proxy :: Proxy a) " = ?")) (Only $ getKey x)
+delete :: forall a . (HasKey a, ToField (Key a)) => Connection -> a -> IO ()
+delete conn x = do execute conn ("delete from "<>tableName (Proxy :: Proxy a)<>" where "
+                                 <> (keyName (Proxy :: Proxy a)<> " = ?")) (Only $ getKey x)
                    return ()
 
-ginsert :: (HasKey a, ToField (Key a)) => Connection -> a -> IO (Key a)
+ginsert :: forall a . (HasKey a, ToField (Key a), FromField (Key a)) => Connection -> a -> IO (Key a)
 ginsert conn val = do
-  if autoIncrementingKey $ Proxy :: Proxy a
+  if autoIncrementingKey (Proxy :: Proxy a)
      then ginsertSerial
-     else ginsertNoKey conn val
+     else do ginsertNoKey conn val
+             return $ getKey val
    where ginsertSerial = do
-           let kName = keyName $ Proxy :: Proxy a
-               tblName = tableName $ Proxy :: Proxy r
-               fldNms = map fromString $ fieldNames $ (Proxy :: Proxy r)
+           let kName = keyName (Proxy :: Proxy a)
+               tblName = tableName (Proxy :: Proxy a)
+               fldNms = map fromString $ fieldNames (Proxy :: Proxy a)
                fldNmsNoKey = filter (/=kName) fldNms
                qmarks = mconcat $ intersperse "," $ map (const "?") fldNms
                fields = mconcat $ intersperse "," $ fldNms
                rows = toRow val
                q = "insert into "<>tblName<>"("<>fields<>") values ("<>qmarks<>") returning "<>kName
                args = map snd $ filter ((/=kName) . fst) $ zip fldNms rows
-           query conn q args
+           res <- query conn q args
+           case res of
+             [] -> fail $ "no key returned from "++show tblName
+             Only k : _ -> return k
+
+--gupsert
+
+--gfastInsert
+
+--gupdate
