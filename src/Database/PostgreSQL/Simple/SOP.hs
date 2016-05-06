@@ -163,25 +163,27 @@ gdelete conn x = do execute conn ("delete from "<>tableName (Proxy :: Proxy a)<>
 
 -- |Insert a new value, respecting primary keys whether they are autoincrementing or not
 ginsert :: forall a . (HasKey a, ToField (Key a), FromField (Key a)) => Connection -> a -> IO (Key a)
-ginsert conn val = do
-  if autoIncrementingKey (Proxy :: Proxy a)
-     then ginsertSerial
-     else do ginsertNoKey conn val
-             return $ getKey val
-   where ginsertSerial = do
-           let kName = keyName (Proxy :: Proxy a)
-               tblName = tableName (Proxy :: Proxy a)
-               fldNms = map fromString $ fieldNames (Proxy :: Proxy a)
-               fldNmsNoKey = filter (/=kName) fldNms
-               qmarks = mconcat $ intersperse "," $ map (const "?") fldNms
-               fields = mconcat $ intersperse "," $ fldNms
-               rows = toRow val
-               q = "insert into "<>tblName<>"("<>fields<>") values ("<>qmarks<>") returning "<>kName
-               args = map snd $ filter ((/=kName) . fst) $ zip fldNms rows
-           res <- query conn q args
-           case res of
-             [] -> fail $ "no key returned from "++show tblName
-             Only k : _ -> return k
+ginsert conn val =
+    if autoIncrementingKey proxy 
+       then ginsertSerial
+    else do 
+      ginsertNoKey conn val
+      return $ getKey val
+   where 
+     proxy = Proxy :: Proxy a
+     ginsertSerial = do
+       let kName = keyName proxy 
+           tblName = tableName proxy  
+           fldNms = map fromString $ fieldNames proxy 
+           fldNmsNoKey = filter (/=kName) fldNms
+           qmarks = mconcat $ intersperse "," $ map (const "?") fldNmsNoKey
+           qFldNms = mconcat $ intersperse "," fldNmsNoKey
+           qArgs = map snd . filter ((/=kName) . fst) . zip fldNms $ toRow val
+           q = "insert into "<>tblName<>" ("<>qFldNms<>") values ("<>qmarks<>") returning "<>kName
+       res <- query conn q qArgs
+       case res of
+         [] -> fail $ "no key returned from "++show tblName
+         Only k : _ -> return k
 
 -- |Update a row, based on its primary key
 gupdate :: forall a . (HasKey a, ToField (Key a)) => Connection -> a -> IO ()
