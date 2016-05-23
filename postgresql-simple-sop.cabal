@@ -16,3 +16,4 @@ library
   build-depends:       base >= 4.6 && < 5
                      , postgresql-simple
                      , generics-sop
+                     , text
