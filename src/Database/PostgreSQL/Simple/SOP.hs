@@ -201,14 +201,14 @@ ginsert conn val = do
                fldNms = map fromString $ fieldNames (Proxy :: Proxy a)
                fldNmsNoKey = filter (/=kName) fldNms
                qmarks = mconcat $ intersperse "," $ map (const "?") fldNms
-               fields = mconcat $ intersperse "," $ fldNms
-               rows = toRow val
+               fields = mconcat $ intersperse "," $ fldNmsNoKey
+               qArgs = map snd $ filter ((/=kName) . fst) $ zip fldNms $ toRow val
                q = "insert into "<>tblName<>"("<>fields<>") values ("<>qmarks<>") returning "<>kName
-               args = map snd $ filter ((/=kName) . fst) $ zip fldNms rows
-           res <- query conn q args
+           res <- query conn q qArgs
            case res of
              [] -> fail $ "no key returned from "++show tblName
              Only k : _ -> return k
+
 
 -- |Update a row, based on its primary key
 gupdate :: forall a . (HasKey a, KeyField (Key a)) => Connection -> a -> IO ()
