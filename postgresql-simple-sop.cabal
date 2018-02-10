@@ -15,4 +15,4 @@ library
   ghc-options:         -Wall -fno-warn-unused-do-bind -fno-warn-orphans -fwarn-incomplete-patterns
   build-depends:       base >= 4.6 && < 5
                      , postgresql-simple
-                     , generics-sop >= 0.2 && < 0.3
+                     , generics-sop >= 0.2 && < 0.4
